@@ -1,0 +1,37 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local experiments
+experiments/*
+!experiments/.gitkeep
+
+# Replays / generated data
+*.replay
+*.jsonl
+replays/
+outputs/
+
+# Build / packaging
+dist/
+build/
+*.zip
