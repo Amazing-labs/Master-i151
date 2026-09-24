@@ -58,7 +58,8 @@ class Card:
     @property
     def is_ace(self) -> bool:
         return self.rank is Rank.ACE
-    
+
+    @staticmethod
     def standard_deck() -> set[Card]:
         """
         Return the 32-card deck used by the documented game version.
