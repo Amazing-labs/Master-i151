@@ -60,15 +60,15 @@ class Card:
         return self.rank is Rank.ACE
     
     def standard_deck() -> set[Card]:
-    """
-    Return the 32-card deck used by the documented game version.
-    """
+        """
+        Return the 32-card deck used by the documented game version.
+        """
 
-    return {
-        Card(rank, suit)
-        for rank in Rank
-        for suit in Suit
-    }
+        return {
+            Card(rank, suit)
+            for rank in Rank
+            for suit in Suit
+        }
 
     def __str__(self) -> str:
         return f"{self.rank.value}{self.suit.value}"
