@@ -46,6 +46,32 @@ décision réel de V2.3 : médiane 0,02 ms, p99,9 0,76 ms, maximum 17,6 ms sur
 `--isolated` (le mode de la compétition) échoue sous Windows
 (`select()` sur des pipes, `WinError 10093`).
 
+### Mode isolé sous Docker
+
+Le mode isolé tourne dans l'image Linux du `Dockerfile` (Python 3.12, SDK
+0.2.10 et moteur 0.2.4 épinglés), via `scripts/bench.ps1`.
+
+`arena match --isolated --games N` n'est pas utilisable pour de longues
+séries. Le CLI garde un seul worker par bot et lui renvoie un `setup` avant
+chaque match. Or `install_competition_sandbox` n'est pas idempotente : chaque
+match ajoute une couche de garde-fous (imports, fichiers). Le coût par partie
+croît donc linéairement, et une série de 1000 parties prend environ 2,8 h.
+`scripts/benchmark.py` reprend la même boucle (mêmes seeds, même premier
+joueur, même `play_bots_match`) avec un worker neuf par match.
+
+Contrôle sur le panel 777 complet (V2.3 contre `medium`, 2000 parties,
+environ 13 min avec 4 processus) :
+
+- 59,7 % ± 2,1 de victoires, comme sous Windows ; +5,5 ± 2,0 points
+  contre V2.1 en appariement ;
+- aucun timeout ni forfait ;
+- 1998 parties sur 2000 sont identiques une à une à celles de Windows
+  (vainqueur, scores, nombre de coups). Les 2 autres sont des timeouts
+  Windows ; jouées normalement, elles sont aussi perdues.
+
+Les timeouts observés sous Windows venaient donc bien du harnais local, pas
+du bot.
+
 ## Règles vérifiées dans le moteur
 
 - `legal_actions` ne génère jamais `PLAY_MULTIPLE_CARDS` : chaque action
@@ -80,9 +106,10 @@ décision réel de V2.3 : médiane 0,02 ms, p99,9 0,76 ms, maximum 17,6 ms sur
 
 **Problème.** Les termes de V2 liés au nombre de cartes jouées sont constants,
 puisque chaque action ne joue qu'une carte. Le bot ne voit pas qu'un coup
-permet d'en jouer d'autres dans le même tour. Dans `replay-v2.json`, 12
-décisions sur 126 ont joué une carte sans suite alors qu'une suite était
-légale.
+permet d'en jouer d'autres dans le même tour. Dans un replay de V2 contre
+`medium` (seed 42), 12 décisions sur 126 ont joué une carte sans suite alors
+qu'une suite était légale. Le replay n'est pas versionné ; pour le régénérer :
+`arena match archive/bots/bot_v2.py --vs medium --games 1 --seed 42 --replay-out replay-v2.json`.
 
 **Modification.** Un coup est noté par la meilleure séquence qu'il ouvre dans
 le tour (enchaînement de même rang, Dame en duel), avec la fonction de score
