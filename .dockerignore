@@ -1,0 +1,2 @@
+# The image copies nothing from the project: it is bind-mounted at run time.
+*
