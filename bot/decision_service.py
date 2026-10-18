@@ -8,10 +8,13 @@
 
 from __future__ import annotations
 
+import random
+
 import actions
 import validators
 from arena_adapter import action_cards, to_game_state, to_suit
 from knowledge import KnowledgeEngine
+from search import MonteCarloSearch
 from strategy import Decision, DecisionKind, Options, StrategyEngine
 
 
@@ -20,9 +23,11 @@ class DecisionService:
         self,
         strategy: StrategyEngine | None = None,
         knowledge: KnowledgeEngine | None = None,
+        search: MonteCarloSearch | None = None,
     ) -> None:
         self.strategy = strategy or StrategyEngine()
         self.knowledge = knowledge or KnowledgeEngine()
+        self.search = search
 
     def reset(self) -> None:
         """New match: forget the previous one."""
@@ -42,6 +47,16 @@ class DecisionService:
         except Exception:
             # Knowledge is an aid: a bug there must not cost a forfeit.
             self.knowledge.reset()
+
+        if self.search is not None and len(legal_actions) > 1:
+            # Deterministic per state, so benchmarks are reproducible.
+            rng = random.Random(state.round_number * 1_000_003 + state.step_index)
+            try:
+                index = self.search.choose(view, legal_actions, self.knowledge, rng)
+            except Exception:
+                index = None
+            if index is not None:
+                return validators.ensure_legal(legal_actions[index], legal_actions)
 
         suit_actions = actions.get_suit_choices(legal_actions)
         play_actions = actions.get_play_actions(legal_actions)

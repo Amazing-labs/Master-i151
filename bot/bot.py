@@ -5,8 +5,11 @@ to bot.py): see decision_service.py for the pipeline.
 """
 
 from decision_service import DecisionService
+from search import MonteCarloSearch, SearchConfig
 
-_service = DecisionService()
+# 400 ms per decision in competition: search for at most 120 ms, the V2.3
+# strategy is the fallback when the search cannot run.
+_service = DecisionService(search=MonteCarloSearch(SearchConfig(worlds=400, time_budget_ms=120.0)))
 
 
 def setup(submission_dir):
