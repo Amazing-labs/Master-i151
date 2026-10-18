@@ -18,7 +18,7 @@ import pytest
 from i151_engine.models.action import Action, ActionType
 from i151_engine.models.card import Card, Rank, Suit
 
-from src.domain.rules import rules as R
+import rules as R
 
 CARD_8S = Card(rank=Rank.EIGHT, suit=Suit.SPADES)
 CARD_9H = Card(rank=Rank.NINE, suit=Suit.HEARTS)

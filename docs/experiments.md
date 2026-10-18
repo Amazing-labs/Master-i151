@@ -22,8 +22,8 @@ exploitables.
 ### Commande de référence
 
 ```powershell
-arena match bot.py --vs medium --games 1000 --seed <panel> --random --starter p0 --decision-timeout-ms 400 --format json
-arena match bot.py --vs medium --games 1000 --seed <panel> --random --starter p1 --decision-timeout-ms 400 --format json
+arena match bot/bot.py --vs medium --games 1000 --seed <panel> --random --starter p0 --decision-timeout-ms 400 --format json
+arena match bot/bot.py --vs medium --games 1000 --seed <panel> --random --starter p1 --decision-timeout-ms 400 --format json
 ```
 
 - `--random --seed X` : panel reproductible de seeds tirés dans [0, 2e9].
@@ -83,6 +83,11 @@ du bot.
   de pénalité.
 - Le perdant d'une manche ajoute les points de sa main. Trois manches
   gagnées d'affilée valent -10. Un joueur est éliminé à `>= 151`.
+- **Bug du moteur 0.2.4.** Finir sa main sur une Dame en duel avec la
+  pioche vide duplique la défausse : `reducer._draw_from_bank` la recycle
+  dans la pioche mais elle reste aussi en défausse (32 → 60 cartes jusqu'à
+  la fin de la manche). Mesuré 7 fois sur 200 parties aléatoires. Les
+  décomptes de cartes de la connaissance sont faux dans ce cas.
 
 ## Résultats
 
@@ -126,9 +131,28 @@ Ils relèvent de l'artefact GC décrit plus haut.
 
 **Décision.** V2.3 devient `bot.py`.
 
+### Bot modulaire (`bot/`) : refonte sans changement de décision
+
+Le bot est découpé en modules plats (adaptateur, état, connaissance, règles,
+stratégie, service) ; le minimax inutilisé est supprimé. Le SDK ne charge que
+des modules plats à côté de `bot.py`, d'où le dossier `bot/`.
+
+Contrôles :
+
+- `tests/test_parity.py` : 60 parties contre `medium`, plus de 10 000
+  décisions, toutes identiques à `archive/bots/bot_v2_3.py`.
+- Panel 777 en mode isolé (Docker) : les 2000 parties sont identiques une à
+  une à celles de V2.3, aucune anomalie.
+- `arena pack bot` produit un ZIP de 11 modules qui passe `arena test`.
+- Latence de décision : médiane 0,13 ms, maximum 25 ms (V2.3 : 0,03 ms et
+  19 ms).
+- Le `KnowledgeEngine` est vérifié contre l'état caché du moteur sur 40
+  parties aléatoires ; alimenté par `decide` et `observe`, il connaît toute
+  la défausse à chaque instant. La stratégie ne l'utilise pas encore.
+
 ## Pistes non testées
 
+- Utiliser la connaissance : cartes inconnues par couleur pour le choix de
+  couleur, probabilité qu'une carte soit chez l'adversaire.
 - Enchaînement de plusieurs 8 dans la séquence.
 - Verrou de l'As (seuls As/8 jouables) non modélisé.
-- Choix de couleur : uniquement le nombre de cartes en main.
-- Aucune mémoire des cartes jouées pendant la manche.

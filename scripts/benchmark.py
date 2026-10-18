@@ -116,11 +116,16 @@ def run(args: argparse.Namespace) -> None:
     seeds = _match_seeds(base_seed=args.panel, games=args.games, randomize=True)
     chunks = [seeds[i:i + CHUNK_SIZE] for i in range(0, len(seeds), CHUNK_SIZE)]
 
-    # Run from a container-local copy: the Windows bind mount is slow.
+    # Run from a container-local copy (the Windows bind mount is slow). The
+    # sibling modules are copied too, since the SDK loads flat local imports;
+    # the entry file becomes bot.py, as in a submission.
+    entry = Path(args.bot)
     workdir = Path(tempfile.mkdtemp(prefix="bench-")) / label
     workdir.mkdir()
+    for module in entry.parent.glob("*.py"):
+        shutil.copyfile(module, workdir / module.name)
     bot_file = workdir / "bot.py"
-    shutil.copyfile(args.bot, bot_file)
+    shutil.copyfile(entry, bot_file)
 
     for starter in STARTERS:
         rows: list[dict] = []

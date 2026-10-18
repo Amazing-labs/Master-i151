@@ -28,8 +28,8 @@ from i151_engine.game.round import create_match
 from i151_engine.models.action import ActionType
 from i151_engine.models.enums import MatchStatus
 
-from src.domain.rules import actions as A
-from src.domain.rules import validators as V
+import actions as A
+import validators as V
 
 pytestmark = pytest.mark.integration
 
