@@ -17,6 +17,11 @@ from knowledge import KnowledgeEngine
 from search import MonteCarloSearch
 from strategy import Decision, DecisionKind, Options, StrategyEngine
 
+# A round is forfeited past 3000 actions (500 in local runs). Searching bots
+# may prefer drawing to playing, so long rounds fall back to the strategy,
+# which always plays when it can.
+MAX_SEARCH_ROUND_STEPS = 300
+
 
 class DecisionService:
     def __init__(
@@ -35,7 +40,7 @@ class DecisionService:
 
     def observe(self, view) -> None:
         """Called by the SDK after every opponent action."""
-        self.knowledge.observe(to_game_state(view))
+        self.knowledge.observe(to_game_state(view), after_opponent_action=True)
 
     def decide(self, view, legal_actions: list):
         if not legal_actions:
@@ -48,7 +53,11 @@ class DecisionService:
             # Knowledge is an aid: a bug there must not cost a forfeit.
             self.knowledge.reset()
 
-        if self.search is not None and len(legal_actions) > 1:
+        if (
+            self.search is not None
+            and len(legal_actions) > 1
+            and self.knowledge.round_steps < MAX_SEARCH_ROUND_STEPS
+        ):
             # Deterministic per state, so benchmarks are reproducible.
             rng = random.Random(state.round_number * 1_000_003 + state.step_index)
             try:
