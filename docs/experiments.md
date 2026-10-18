@@ -150,9 +150,32 @@ Contrôles :
   parties aléatoires ; alimenté par `decide` et `observe`, il connaît toute
   la défausse à chaque instant. La stratégie ne l'utilise pas encore.
 
+### V3 : recherche Monte Carlo déterminisée (retenue)
+
+**Idée.** À chaque décision, tirer des mondes possibles (main adverse et
+ordre de la pioche) parmi les cartes inconnues, simuler chaque coup légal
+jusqu'à la fin de la manche et jouer le meilleur en moyenne. Après un
+recyclage, la pioche est la défausse dans l'ordre de jeu : son ordre est
+connu, donc aussi les cartes que l'adversaire y pioche.
+
+**Mise en œuvre.** `fastsim.py` (copie des règles du moteur, environ 10 fois
+plus rapide, identique au moteur sur plus de 100 000 actions aléatoires),
+`search.py` (mondes, simulations avec une politique proche de `medium`,
+120 ms maximum), `knowledge.py` (ordre de la pioche et cartes adverses
+connues, vérifiés contre l'état caché du moteur).
+
+| Mesure | Résultat |
+| ------ | -------- |
+| Recherche simple (politique gloutonne, sans pioche connue), 128 parties | +5,5 ± 11,4 points vs V2.3 (non significatif) |
+| V3, 32 mondes, 200 parties appariées vs V2.3 | 89,5 % contre 53,0 %, +36,5 ± 8,2 points |
+| V3 en mode isolé, 400 ms, recherche 120 ms, 60 parties (nous commençons) | 57/60, aucun timeout |
+
+La part respective de la politique de simulation et de la pioche connue n'a
+pas été isolée.
+
 ## Pistes non testées
 
-- Utiliser la connaissance : cartes inconnues par couleur pour le choix de
-  couleur, probabilité qu'une carte soit chez l'adversaire.
+- Inférence « l'adversaire a pioché ou passé au lieu de jouer, donc aucune
+  carte jouable » pour affiner les mondes (hypothèse sur l'adversaire).
 - Enchaînement de plusieurs 8 dans la séquence.
 - Verrou de l'As (seuls As/8 jouables) non modélisé.

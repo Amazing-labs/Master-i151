@@ -111,19 +111,38 @@ def _sample_world(view, knowledge: KnowledgeEngine, me: int, rng: random.Random)
         recent = [fastsim.card_id(card) for card in table.recent_cards]
         pile = [None] * (table.played_pile_size - len(recent)) + recent
 
+    # Bank order known after a refill, and opponent cards drawn from it.
+    bank_order = None
+    if knowledge.bank_order is not None and len(knowledge.bank_order) == table.bank_size:
+        bank_order = [_domain_id(card) if card is not None else None for card in knowledge.bank_order]
+    opponent_known = [_domain_id(card) for card in knowledge.opponent_known]
+
     excluded = set(our_hand)
     excluded.update(card for card in pile if card is not None)
+    if bank_order is not None:
+        excluded.update(card for card in bank_order if card is not None)
+    excluded.update(opponent_known)
     unknown = [card for card in range(32) if card not in excluded]
     rng.shuffle(unknown)
 
     opponent_size = view.opponents[0].hand_size
-    opponent_hand = unknown[:opponent_size]
-    rest = unknown[opponent_size:]
+    missing = opponent_size - len(opponent_known)
+    if missing < 0:
+        opponent_known, missing = [], opponent_size
+    opponent_hand = opponent_known + unknown[:missing]
+    rest = unknown[missing:]
     for position, card in enumerate(pile):
         if card is None:
             if not rest:
                 return None
             pile[position] = rest.pop()
+    if bank_order is not None:
+        for position, card in enumerate(bank_order):
+            if card is None:
+                if not rest:
+                    return None
+                bank_order[position] = rest.pop()
+        rest = bank_order + rest  # leftovers only if the engine duplicated cards
 
     hands = [None, None]
     hands[me] = our_hand

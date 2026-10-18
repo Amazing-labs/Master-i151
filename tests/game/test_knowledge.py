@@ -54,12 +54,16 @@ def test_missed_plays_stay_unknown():
     assert k.unknown_pile_count() == 1
 
 
-def test_pile_shuffled_back_into_bank_is_forgotten():
+def test_pile_shuffled_back_into_bank_gives_the_bank_order():
     k = KnowledgeEngine()
-    k.observe(_state(3, [AS, KS, QS], step=1))
-    k.observe(_state(1, [JS], step=2))
+    k.observe(_state(3, [AS, KS, QS], step=1, bank=0))
+    # The opponent drew (refill: bank = [AS, KS, QS], one drawn) then played JS.
+    k.observe(_state(1, [JS], step=2, bank=2, opponent=6))
     assert k.pile == [JS]
-    assert k.is_unknown(AS)
+    assert k.bank_order == [KS, QS]
+    assert k.opponent_known == {AS}
+    assert k.opponent_probability(AS) == 1.0
+    assert not k.is_unknown(KS)
 
 
 def test_new_round_and_new_match_reset_the_knowledge():
@@ -121,6 +125,8 @@ def _card_count(round_state) -> int:
 @pytest.mark.integration
 def test_knowledge_never_contradicts_the_engine():
     observations = 0
+    tracked_banks: list[int] = []
+    known_opponent_cards: list[int] = []
     for seed in range(40):
         k = KnowledgeEngine()
         for view, truth in _random_match_views(seed):
@@ -136,12 +142,20 @@ def test_knowledge_never_contradicts_the_engine():
             for known, actual in zip(k.pile, true_pile):
                 assert known is None or known == actual
 
-            hidden = {to_card(c) for c in truth.bank} | {
-                to_card(c) for c in truth.player_by_id("p1").hand
-            }
-            assert hidden <= k.unknown_cards
-            assert len(k.unknown_cards) == len(hidden) + k.unknown_pile_count()
+            true_bank = [to_card(c) for c in truth.bank]
+            true_opponent = {to_card(c) for c in truth.player_by_id("p1").hand}
+            if k.bank_order is not None:
+                assert len(k.bank_order) == len(true_bank)
+                for known, actual in zip(k.bank_order, true_bank):
+                    assert known is None or known == actual
+                tracked_banks.append(sum(c is not None for c in k.bank_order))
+            assert k.opponent_known <= true_opponent
+            known_opponent_cards.append(len(k.opponent_known))
+
+            hidden = set(true_bank) | true_opponent
+            assert hidden <= k.unknown_cards | k.known_bank_cards() | k.opponent_known
     assert observations > 10_000
+    assert sum(tracked_banks) > 0 and sum(known_opponent_cards) > 0
 
 
 @pytest.mark.integration

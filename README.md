@@ -7,21 +7,21 @@ with reproducible paired benchmarks.
 
 ## Status
 
-The competition bot (`bot/`) plays the V2.3 strategy. Against the public
-`medium` example bot, on 2000 games per panel (random seeds, both starting
-players):
+The competition bot (`bot/`) is **V3: determinized Monte Carlo search**.
+At each decision it samples possible worlds (opponent hand and bank order)
+from the cards it does not know yet, simulates every legal move to the end
+of the round with `fastsim` and plays the best one on average. After the
+played pile is shuffled back into the bank, the bank order is known, so the
+cards the opponent draws are known too.
 
-| Panel | Win rate | vs previous version (V2.1), paired |
-| ----- | -------: | ---------------------------------: |
-| 2026 (development) | 54.2% ± 2.2 | +4.1 ± 2.1 points |
-| 777 (confirmation) | 59.7% ± 2.1 | +5.6 ± 2.0 points |
-
-Against `basic`: 81.8% ± 1.7. In isolated mode (the competition mode), panel
-777 gives the same games with no timeout or forfeit. Full protocol and
-history: [`docs/experiments.md`](docs/experiments.md).
+| Bot vs `medium` | Win rate | Setting |
+| --------------- | -------: | ------- |
+| V3 (search) | 89.5% (n = 200), +36.5 ± 8.2 points over V2.3, paired | in-process, 32 worlds |
+| V3 (search) | 95% (57/60, we start), no timeout | isolated mode, 400 ms, 120 ms search |
+| V2.3 (heuristics) | 57% ± 1.5 (n = 4000) | isolated mode |
 
 `medium` is a public example; the strength of the real competitors is
-unknown.
+unknown. Full protocol and history: [`docs/experiments.md`](docs/experiments.md).
 
 ## Quick start
 
@@ -53,7 +53,8 @@ StrategyEngine.decide ──> Decision (index) ──> legal Action ──> vali
 | `decision_service.py` | The pipeline above |
 | `arena_adapter.py` | The only module that reads SDK and engine types |
 | `cards.py`, `game_state.py` | Domain cards and the observable game state |
-| `knowledge.py` | Our hand, the played pile tracked card by card, unknown cards (bank + opponent hand) and uniform opponent probabilities; reset every round |
+| `knowledge.py` | Our hand, the played pile tracked card by card, the bank order after a refill, opponent cards drawn from it, unknown cards and opponent probabilities; reset every round |
+| `search.py`, `fastsim.py` | Monte Carlo search and the fast rules simulator it runs on |
 | `rules.py` | Rule registry with confidence levels (RULE / FACT / HYPOTHESIS / UNKNOWN) and card playability |
 | `actions.py`, `validators.py` | Legal action classification and the final legality guard |
 | `strategy.py`, `weights.py` | Strategy engine and its tunable weights |
@@ -71,12 +72,18 @@ Design rules:
 - **Knowledge must never cost a match.** A failure in `observe` or in the
   knowledge update is caught; the decision still happens.
 
-The V2.3 heuristics score a play by the best sequence it opens within the
-same turn (same-rank chaining, Queen extra turn in a duel), hold eights early
-and dump them late, use aces when we cannot follow the suit, and choose the
-suit we hold most after an eight. `tests/test_parity.py` checks that `bot/`
-takes exactly the decisions of `archive/bots/bot_v2_3.py`. The knowledge
-engine is wired but not yet used by the heuristics.
+`search.py` runs the Monte Carlo search for at most 120 ms per decision
+(competition limit: 400 ms). `fastsim.py` is a faithful, about ten times
+faster copy of the engine rules; `tests/test_fastsim.py` replays random games
+in both and checks that every legal action list and every state are
+identical. Rollouts use a policy close to the public `medium` heuristics for
+both players.
+
+When the search cannot run, the V2.3 heuristics of `strategy.py` decide: a
+play is scored by the best sequence it opens within the same turn, eights are
+held early and dumped late, aces are used when we cannot follow the suit, and
+the suit we hold most is chosen after an eight. `tests/test_parity.py` checks
+that this strategy takes exactly the decisions of `archive/bots/bot_v2_3.py`.
 
 ## Game rules in brief
 
@@ -105,9 +112,9 @@ Verified in the engine source (details and sources in
 - **Forbidden at runtime** (sandbox): `os`, `subprocess`, `socket`, `pickle`,
   `importlib`, `asyncio`, `gc`, `signal`, `multiprocessing` and others; see
   `FORBIDDEN_RUNTIME_IMPORTS` in `arena_sdk/ipc/sandbox.py`. The bot only
-  uses `dataclasses`, `enum`, `collections` and `typing`.
-- **400 ms per decision** (competition rules). Current latency: median
-  0.13 ms, maximum 25 ms.
+  uses `dataclasses`, `enum`, `collections`, `typing`, `random` and `time`.
+- **400 ms per decision** (competition rules). The search stops after
+  120 ms; no timeout in isolated-mode tests.
 - Illegal action, crash or timeout means a forfeit.
 
 ## Tests
