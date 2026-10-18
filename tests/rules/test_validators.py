@@ -18,8 +18,8 @@ import pytest
 from i151_engine.models.action import Action, ActionType
 from i151_engine.models.card import Card, Rank, Suit
 
-from src.domain.rules import actions as A
-from src.domain.rules import validators as V
+import actions as A
+import validators as V
 
 CARD_8S = Card(rank=Rank.EIGHT, suit=Suit.SPADES)
 CARD_9H = Card(rank=Rank.NINE, suit=Suit.HEARTS)

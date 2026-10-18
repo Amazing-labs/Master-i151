@@ -1,6 +1,6 @@
 # Runs scripts/benchmark.py inside the Linux Arena image (isolated mode).
 # Examples:
-#   .\scripts\bench.ps1 run bot.py --panel 777 --games 1000
+#   .\scripts\bench.ps1 run bot/bot.py --panel 777 --games 1000
 #   .\scripts\bench.ps1 compare bot bot_v2_1 --panel 777
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot

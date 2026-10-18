@@ -1,0 +1,67 @@
+"""Orchestration: PlayerView -> GameState -> knowledge -> strategy -> Action.
+
+    view ──arena_adapter──> GameState ──> KnowledgeEngine.observe
+    legal_actions ──actions (classification)──> strategy.Options
+    StrategyEngine.decide ──> Decision (index) ──> legal Action
+    validators.ensure_legal: final guard before returning to the SDK
+"""
+
+from __future__ import annotations
+
+import actions
+import validators
+from arena_adapter import action_cards, to_game_state, to_suit
+from knowledge import KnowledgeEngine
+from strategy import Decision, DecisionKind, Options, StrategyEngine
+
+
+class DecisionService:
+    def __init__(
+        self,
+        strategy: StrategyEngine | None = None,
+        knowledge: KnowledgeEngine | None = None,
+    ) -> None:
+        self.strategy = strategy or StrategyEngine()
+        self.knowledge = knowledge or KnowledgeEngine()
+
+    def reset(self) -> None:
+        """New match: forget the previous one."""
+        self.knowledge.reset()
+
+    def observe(self, view) -> None:
+        """Called by the SDK after every opponent action."""
+        self.knowledge.observe(to_game_state(view))
+
+    def decide(self, view, legal_actions: list):
+        if not legal_actions:
+            raise ValueError("The engine provided no legal action.")
+
+        state = to_game_state(view)
+        try:
+            self.knowledge.observe(state)
+        except Exception:
+            # Knowledge is an aid: a bug there must not cost a forfeit.
+            self.knowledge.reset()
+
+        suit_actions = actions.get_suit_choices(legal_actions)
+        play_actions = actions.get_play_actions(legal_actions)
+        pass_actions = actions.get_pass_actions(legal_actions)
+        options = Options(
+            suits=tuple(to_suit(action.chosen_suit) for action in suit_actions),
+            plays=tuple(action_cards(action) for action in play_actions),
+            can_pass=bool(pass_actions),
+        )
+
+        decision = self.strategy.decide(state, self.knowledge, options)
+        chosen = _to_action(decision, legal_actions, suit_actions, play_actions, pass_actions)
+        return validators.ensure_legal(chosen, legal_actions)
+
+
+def _to_action(decision: Decision, legal_actions, suit_actions, play_actions, pass_actions):
+    if decision.kind is DecisionKind.CHOOSE_SUIT:
+        return suit_actions[decision.index]
+    if decision.kind is DecisionKind.PLAY:
+        return play_actions[decision.index]
+    if decision.kind is DecisionKind.PASS:
+        return pass_actions[0]
+    return legal_actions[0]

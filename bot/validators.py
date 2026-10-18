@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from i151_engine.models.action import Action, ActionType
 
-from .rules import is_multiple_card_play, is_single_card_play, is_suit_choice_required
+from rules import is_multiple_card_play, is_single_card_play, is_suit_choice_required
 
 __all__ = [
     "ActionValidationError",

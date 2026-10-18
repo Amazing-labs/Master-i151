@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .cards import Card, Suit
+from cards import Card, Suit
 
 
 @dataclass(slots=True)
@@ -56,6 +56,10 @@ class TableState:
 
     played_pile_size: int = 0
 
+    last_play_cards: list[Card] = field(default_factory=list)
+
+    must_choose_suit: bool = False
+
 
 @dataclass(slots=True)
 class TurnState:
@@ -85,6 +89,7 @@ class GameState:
 
     you: PlayerState = field(default_factory=PlayerState)
 
+    # Only public information: the opponent's hand and hand_points stay empty.
     opponent: PlayerState = field(default_factory=PlayerState)
 
     table: TableState = field(default_factory=TableState)
@@ -100,6 +105,10 @@ class GameState:
     round_number: int = 0
 
     round_active: bool = False
+
+    player_count: int = 2
+
+    active_player_count: int = 2
 
     # ------------------------------------------------------------------
     # Observation state
@@ -122,13 +131,6 @@ class GameState:
 
     def is_opponent_eliminated(self) -> bool:
         return self.opponent.total_score >= self.target_score
-
-    def current_hand_points_difference(self) -> int:
-        """
-        Positive value means our current hand contains more points.
-        """
-
-        return self.you.hand_points - self.opponent.hand_points
 
     def score_difference(self) -> int:
         """
