@@ -32,6 +32,8 @@ class SearchConfig:
     max_rollout_steps: int = 250
     elimination_value: float = 300.0
     rollout_policy: str = "heuristic"  # "heuristic" or "greedy"
+    # HYPOTHESIS: the opponent always plays when it can (knowledge.opponent_excluded).
+    infer_no_play: bool = False
 
 
 class MonteCarloSearch:
@@ -55,7 +57,7 @@ class MonteCarloSearch:
         sums = [0.0] * len(candidates)
         worlds = 0
         while worlds < self.config.worlds:
-            world = _sample_world(view, knowledge, me, rng)
+            world = _sample_world(view, knowledge, me, rng, self.config.infer_no_play)
             if world is None:
                 return None
             seed = rng.random()
@@ -100,7 +102,7 @@ class MonteCarloSearch:
         return value
 
 
-def _sample_world(view, knowledge: KnowledgeEngine, me: int, rng: random.Random) -> SimState | None:
+def _sample_world(view, knowledge: KnowledgeEngine, me: int, rng: random.Random, infer: bool = False) -> SimState | None:
     """A full round state consistent with what we observed."""
     table = view.table
     our_hand = [fastsim.card_id(card) for card in view.you.hand]
@@ -129,8 +131,21 @@ def _sample_world(view, knowledge: KnowledgeEngine, me: int, rng: random.Random)
     missing = opponent_size - len(opponent_known)
     if missing < 0:
         opponent_known, missing = [], opponent_size
-    opponent_hand = opponent_known + unknown[:missing]
-    rest = unknown[missing:]
+    opponent_hand = None
+    if infer and knowledge.opponent_excluded and missing > 0:
+        # Cards the opponent held when it could not play avoid the excluded
+        # set; only its `free` cards drawn since then may be anything.
+        excluded_ids = {_domain_id(card) for card in knowledge.opponent_excluded}
+        free = min(knowledge.opponent_free, missing)
+        allowed = [card for card in unknown if card not in excluded_ids]
+        if len(allowed) >= missing - free:
+            constrained = allowed[: missing - free]
+            others = [card for card in unknown if card not in constrained]
+            opponent_hand = opponent_known + constrained + others[:free]
+            rest = others[free:]
+    if opponent_hand is None:
+        opponent_hand = opponent_known + unknown[:missing]
+        rest = unknown[missing:]
     for position, card in enumerate(pile):
         if card is None:
             if not rest:

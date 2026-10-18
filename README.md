@@ -7,7 +7,7 @@ with reproducible paired benchmarks.
 
 ## Status
 
-The competition bot (`bot/`) is **V3: determinized Monte Carlo search**.
+The competition bot (`bot/`) is **V4: determinized Monte Carlo search**.
 At each decision it samples possible worlds (opponent hand and bank order)
 from the cards it does not know yet, simulates every legal move to the end
 of the round with `fastsim` and plays the best one on average. After the
@@ -16,6 +16,8 @@ cards the opponent draws are known too.
 
 | Bot vs `medium` | Win rate | Setting |
 | --------------- | -------: | ------- |
+| V4 vs V3 (search 200 ms vs 120 ms) | 61.3% (196/320), head to head, seats swapped | in-process, 64 vs 32 worlds |
+| V4 vs `medium` | 97.5% (39/40), no timeout | isolated mode, 400 ms, 200 ms search |
 | V3 (search) | 89.5% (n = 200), +36.5 ± 8.2 points over V2.3, paired | in-process, 32 worlds |
 | V3 (search) | 94.2% ± 4.2 (113/120), no timeout | isolated mode, 400 ms, 120 ms search |
 | V2.3 (heuristics) | 57% ± 1.5 (n = 4000) | isolated mode |
@@ -72,7 +74,7 @@ Design rules:
 - **Knowledge must never cost a match.** A failure in `observe` or in the
   knowledge update is caught; the decision still happens.
 
-`search.py` runs the Monte Carlo search for at most 120 ms per decision
+`search.py` runs the Monte Carlo search for at most 200 ms per decision
 (competition limit: 400 ms). `fastsim.py` is a faithful, about ten times
 faster copy of the engine rules; `tests/test_fastsim.py` replays random games
 in both and checks that every legal action list and every state are
@@ -114,7 +116,10 @@ Verified in the engine source (details and sources in
   `FORBIDDEN_RUNTIME_IMPORTS` in `arena_sdk/ipc/sandbox.py`. The bot only
   uses `dataclasses`, `enum`, `collections`, `typing`, `random` and `time`.
 - **400 ms per decision** (competition rules). The search stops after
-  120 ms; no timeout in isolated-mode tests.
+  200 ms; no timeout in isolated-mode tests.
+- **3000 actions per round**, or a forfeit. Two searching bots may both
+  prefer drawing to playing, so after 300 actions in a round the bot falls
+  back to the V2.3 strategy, which always plays when it can.
 - Illegal action, crash or timeout means a forfeit.
 
 ## Tests

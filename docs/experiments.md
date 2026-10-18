@@ -173,6 +173,25 @@ connues, vérifiés contre l'état caché du moteur).
 La part respective de la politique de simulation et de la pioche connue n'a
 pas été isolée.
 
+### V4 : plus de calcul et garde-fou de longueur de manche (retenue)
+
+Faute d'accès aux bots du haut du classement, les variantes sont mesurées en
+face-à-face contre V3 (chaque seed joué deux fois, places inversées).
+
+| Variante contre V3 | Résultat | Décision |
+| ------------------ | -------- | -------- |
+| 64 mondes contre 32 (≈ 200 ms contre 120 ms) | 88/160 puis 108/160, soit 196/320 = 61,3 % | retenue : recherche à 200 ms |
+| Inférence « pioche/passe ⇒ aucune carte jouable » | 81/160 = 50,6 % ± 7,9 | non retenue (aucun gain, hypothèse risquée) |
+
+L'inférence est juste contre `medium` (0 contradiction sur 6705
+observations) ; elle reste dans le code, désactivée
+(`SearchConfig.infer_no_play`).
+
+Un duel s'est terminé par `max_steps` : deux bots qui cherchent peuvent
+préférer piocher à jouer et faire durer une manche jusqu'au forfait. Au-delà
+de 300 actions dans une manche, le bot repasse sur la stratégie V2.3, qui
+joue toujours quand elle peut.
+
 ## Pistes non testées
 
 - Inférence « l'adversaire a pioché ou passé au lieu de jouer, donc aucune

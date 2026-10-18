@@ -165,3 +165,12 @@ def test_pile_is_fully_known_when_fed_every_step():
         for view, _truth in _random_match_views(seed):
             k.observe(to_game_state(view))
             assert k.unknown_pile_count() == 0
+
+
+def test_round_steps_restart_with_each_round():
+    k = KnowledgeEngine()
+    k.observe(_state(0, [], round_number=1, step=5))
+    k.observe(_state(1, [AS], round_number=1, step=42))
+    assert k.round_steps == 37
+    k.observe(_state(0, [], round_number=2, step=50))
+    assert k.round_steps == 0

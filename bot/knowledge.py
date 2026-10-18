@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from cards import Card, Suit, standard_deck
 from game_state import GameState
+from rules import can_play_with_required_suit
 
 
 @dataclass(slots=True)
@@ -39,6 +40,11 @@ class KnowledgeEngine:
 
     last_step_index: int = -1
 
+    # Actions played since the start of the round (approximate: counted from
+    # our first observation of the round).
+    round_start_step: int = 0
+    round_steps: int = 0
+
     hand: frozenset[Card] = frozenset()
 
     pile: list[Card | None] = field(default_factory=list)
@@ -57,6 +63,15 @@ class KnowledgeEngine:
     # Cards certainly in the opponent's hand: drawn from a known bank order.
     opponent_known: set[Card] = field(default_factory=set)
 
+    # HYPOTHESIS (the opponent always plays when it can): after a draw or a
+    # pass, the cards that were playable were not in its hand. Only the
+    # opponent's cards drawn since that moment (`opponent_free`) may be among
+    # them. Search uses it only when SearchConfig.infer_no_play is set.
+    opponent_excluded: frozenset[Card] = frozenset()
+    opponent_free: int = 0
+    last_opponent_event: str = ""
+    required_suit: Suit | None = None
+
     def reset(self) -> None:
         """Forget everything (new match)."""
         self.round_number = None
@@ -68,14 +83,19 @@ class KnowledgeEngine:
         self.unknown_cards = frozenset()
         self.bank_order = None
         self.opponent_known = set()
+        self.opponent_excluded = frozenset()
+        self.opponent_free = 0
+        self.last_opponent_event = ""
+        self.required_suit = None
 
-    def observe(self, state: GameState) -> None:
+    def observe(self, state: GameState, after_opponent_action: bool = False) -> None:
         """Update the knowledge from one observable state. Makes no decision."""
         new_round = state.round_number != self.round_number
         new_match = state.step_index < self.last_step_index
         if new_round or new_match:
             self.reset()
             self.round_number = state.round_number
+            self.round_start_step = state.step_index
             fresh = True
         else:
             fresh = False
@@ -87,11 +107,15 @@ class KnowledgeEngine:
 
         if not fresh:
             self._track_bank(state, previous_pile, previous_bank, previous_hand, hand_now)
+            if after_opponent_action:
+                self._infer_from_opponent_action(state, previous_pile)
 
         self.last_step_index = state.step_index
+        self.round_steps = state.step_index - self.round_start_step
         self.hand = hand_now
         self.opponent_hand_size = state.opponent.hand_size
         self.bank_size = state.table.bank_size
+        self.required_suit = state.table.required_suit
         self._sync_pile(state.table.played_pile_size, state.table.recent_cards)
 
         self.opponent_known -= self.known_pile_cards()
@@ -103,6 +127,44 @@ class KnowledgeEngine:
             self.deck - self.hand - self.known_pile_cards()
             - self.known_bank_cards() - frozenset(self.opponent_known)
         )
+
+    def _infer_from_opponent_action(self, state: GameState, previous_pile) -> None:
+        """Read the opponent's last action from the change of public state."""
+        before, after = self.opponent_hand_size, state.opponent.hand_size
+        table = state.table
+        top = table.top_card
+
+        def playable() -> frozenset[Card]:
+            return frozenset(c for c in self.deck if can_play_with_required_suit(c, top, table.required_suit))
+
+        if after > before:
+            # Drew instead of playing (an ace penalty draws 2: aces and eights
+            # are the playable cards on an ace).
+            if top is not None:
+                self.opponent_excluded = playable()
+                self.opponent_free = after - before
+            else:
+                self.opponent_free += after - before
+            self.last_opponent_event = "draw"
+        elif after == before and table.played_pile_size > len(previous_pile):
+            # Played its last card (a Queen in a duel) and had to draw one.
+            self.opponent_free += 1
+            self.last_opponent_event = "play"
+        elif after < before:
+            self.opponent_free = min(self.opponent_free, after)
+            self.last_opponent_event = "play"
+        elif table.required_suit != self.required_suit:
+            self.last_opponent_event = "suit"
+        elif table.played_pile_size == len(previous_pile) and top is not None:
+            # Passed: after a draw nothing was playable, while chaining no card
+            # of the same rank was left.
+            if self.last_opponent_event == "draw":
+                self.opponent_excluded = playable()
+                self.opponent_free = 0
+            elif self.last_opponent_event == "play":
+                self.opponent_excluded = frozenset(c for c in self.deck if c.rank is top.rank)
+                self.opponent_free = 0
+            self.last_opponent_event = "pass"
 
     def _track_bank(self, state, previous_pile, previous_bank, previous_hand, hand_now) -> None:
         """Follow the bank order through refills and draws (one gap between
