@@ -17,7 +17,7 @@ cards the opponent draws are known too.
 | Bot vs `medium` | Win rate | Setting |
 | --------------- | -------: | ------- |
 | V3 (search) | 89.5% (n = 200), +36.5 ± 8.2 points over V2.3, paired | in-process, 32 worlds |
-| V3 (search) | 95% (57/60, we start), no timeout | isolated mode, 400 ms, 120 ms search |
+| V3 (search) | 94.2% ± 4.2 (113/120), no timeout | isolated mode, 400 ms, 120 ms search |
 | V2.3 (heuristics) | 57% ± 1.5 (n = 4000) | isolated mode |
 
 `medium` is a public example; the strength of the real competitors is

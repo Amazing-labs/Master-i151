@@ -168,7 +168,7 @@ connues, vérifiés contre l'état caché du moteur).
 | ------ | -------- |
 | Recherche simple (politique gloutonne, sans pioche connue), 128 parties | +5,5 ± 11,4 points vs V2.3 (non significatif) |
 | V3, 32 mondes, 200 parties appariées vs V2.3 | 89,5 % contre 53,0 %, +36,5 ± 8,2 points |
-| V3 en mode isolé, 400 ms, recherche 120 ms, 60 parties (nous commençons) | 57/60, aucun timeout |
+| V3 en mode isolé, 400 ms, recherche 120 ms, panel 777, 120 parties | 113/120 (94,2 % ± 4,2), aucun timeout ; ZIP validé sous Python 3.11 |
 
 La part respective de la politique de simulation et de la pioche connue n'a
 pas été isolée.
