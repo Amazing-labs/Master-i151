@@ -34,6 +34,9 @@ class SearchConfig:
     rollout_policy: str = "heuristic"  # "heuristic" or "greedy"
     # HYPOTHESIS: the opponent always plays when it can (knowledge.opponent_excluded).
     infer_no_play: bool = False
+    # When a card can be played, only compare plays (and suit choices):
+    # drawing or passing to keep cards loses the race against fast bots.
+    play_when_possible: bool = False
 
 
 class MonteCarloSearch:
@@ -47,7 +50,14 @@ class MonteCarloSearch:
 
         started = time.perf_counter()
         budget = self.config.time_budget_ms / 1000.0
-        candidates = [fastsim.to_action_tuple(action) for action in legal_actions]
+        indices = list(range(len(legal_actions)))
+        if self.config.play_when_possible:
+            kinds = [action.type.value for action in legal_actions]
+            if any(kind in ("playCard", "chooseSuit") for kind in kinds):
+                indices = [i for i, kind in enumerate(kinds) if kind in ("playCard", "chooseSuit")]
+            if len(indices) == 1:
+                return indices[0]
+        candidates = [fastsim.to_action_tuple(legal_actions[i]) for i in indices]
         me = list(view.match.seats).index(view.you.player_id)
         totals = [0, 0]
         totals[me] = view.you.total_score
@@ -69,12 +79,12 @@ class MonteCarloSearch:
             if time.perf_counter() - started > budget:
                 break
 
-        return max(range(len(candidates)), key=lambda i: sums[i])
+        return indices[max(range(len(candidates)), key=lambda i: sums[i])]
 
     def _rollout(self, state: SimState, me: int, totals: list, target: int, rng: random.Random) -> float:
         steps = 0
         limit = self.config.max_rollout_steps
-        policy = heuristic if self.config.rollout_policy == "heuristic" else greedy
+        policy = {"heuristic": heuristic, "chain": chain_heuristic}.get(self.config.rollout_policy, greedy)
         while not state.ended and steps < limit:
             actions = fastsim.legal_actions(state)
             if not actions:
@@ -187,7 +197,14 @@ def _domain_id(card) -> int:
     return fastsim.SUITS.index(fastsim.Suit[card.suit.name]) * 8 + fastsim.RANKS.index(fastsim.Rank[card.rank.name])
 
 
-def heuristic(state: SimState, actions: list) -> tuple:
+def chain_heuristic(state: SimState, actions: list) -> tuple:
+    """`heuristic` plus the V2.3 continuation value: a card that lets the player
+    go on within the same turn (same-rank chaining, Queen extra turn) is worth
+    the cards it opens."""
+    return heuristic(state, actions, continuation=True)
+
+
+def heuristic(state: SimState, actions: list, continuation: bool = False) -> tuple:
     """Rollout policy close to the V2.1 / public medium heuristics, for both
     players: single-card scores keep only the terms that differ between plays."""
     hand = state.hands[state.current]
@@ -249,6 +266,17 @@ def heuristic(state: SimState, actions: list) -> tuple:
                 for other in hand:
                     if other != card and other % 8 == QUEEN:
                         score -= 40
+            if continuation and remaining > 0:
+                top = state.top
+                if top != NO_CARD and top % 8 == rank:
+                    for other in hand:
+                        if other != card and other % 8 == rank:
+                            score += 34 + CARD_POINTS[other]
+                elif rank == QUEEN:
+                    on_queen = fastsim._PLAYABLE[(card + 1) * 5]
+                    follow = [CARD_POINTS[other] for other in hand if other != card and on_queen[other]]
+                    if follow:
+                        score += 34 + max(follow)
         if best_score is None or score > best_score:
             best, best_score = action, score
     if best is not None:

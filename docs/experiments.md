@@ -182,6 +182,8 @@ face-à-face contre V3 (chaque seed joué deux fois, places inversées).
 | ------------------ | -------- | -------- |
 | 64 mondes contre 32 (≈ 200 ms contre 120 ms) | 88/160 puis 108/160, soit 196/320 = 61,3 % | retenue : recherche à 200 ms |
 | Inférence « pioche/passe ⇒ aucune carte jouable » | 81/160 = 50,6 % ± 7,9 | non retenue (aucun gain, hypothèse risquée) |
+| Toujours jouer quand c'est possible (sur la plateforme, la V4 perdait la course contre le top 2 ; elle piochait dans 17 % des cas jouables) | 55/120 = 45,8 % ± 8,8 | non retenue |
+| Politique de simulation avec enchaînements (64 mondes des deux côtés) | 91/160 puis 85/160, soit 176/320 = 55,0 % | non retenue (pas nette) |
 
 L'inférence est juste contre `medium` (0 contradiction sur 6705
 observations) ; elle reste dans le code, désactivée
@@ -192,7 +194,19 @@ préférer piocher à jouer et faire durer une manche jusqu'au forfait. Au-delà
 de 300 actions dans une manche, le bot repasse sur la stratégie V2.3, qui
 joue toujours quand elle peut.
 
+### V4.1 : simulateur accéléré (retenue)
+
+`fastsim` lit la jouabilité dans une table précalculée (33 cartes du dessus
+× 5 couleurs imposées × 32 cartes) au lieu d'appeler `can_play`. Le filtre
+est 3,4 fois plus rapide ; la recherche fait plus de mondes dans les mêmes
+200 ms. Aucune décision ne change à mondes égaux : le test différentiel
+moteur ↔ fastsim passe.
+
 ## Pistes non testées
+
+- Solveur exact de fin de manche quand l'ordre de la pioche est connu.
+- Fonction de valeur liée au score du match (bonus de trois manches,
+  adversaire proche de 151).
 
 - Inférence « l'adversaire a pioché ou passé au lieu de jouer, donc aucune
   carte jouable » pour affiner les mondes (hypothèse sur l'adversaire).
