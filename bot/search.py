@@ -273,10 +273,8 @@ def heuristic(state: SimState, actions: list, continuation: bool = False) -> tup
                         if other != card and other % 8 == rank:
                             score += 34 + CARD_POINTS[other]
                 elif rank == QUEEN:
-                    follow = [
-                        CARD_POINTS[other] for other in hand
-                        if other != card and fastsim.can_play(other, card, NO_SUIT)
-                    ]
+                    on_queen = fastsim._PLAYABLE[(card + 1) * 5]
+                    follow = [CARD_POINTS[other] for other in hand if other != card and on_queen[other]]
                     if follow:
                         score += 34 + max(follow)
         if best_score is None or score > best_score:

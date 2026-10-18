@@ -63,6 +63,14 @@ def can_play(card: int, top: int, required: int) -> bool:
     return can_play_on(card, top)
 
 
+# Precomputed can_play: row (top + 1) * 5 + (required + 1), column = card.
+_PLAYABLE = tuple(
+    tuple(can_play(card, top, required) for card in range(32))
+    for top in range(NO_CARD, 32)
+    for required in range(NO_SUIT, 4)
+)
+
+
 class SimState:
     __slots__ = (
         "hands", "current", "top", "required", "choose", "ace", "skip",
@@ -153,7 +161,8 @@ def legal_actions(s: SimState) -> list[tuple]:
     if top == NO_CARD and s.required == NO_SUIT:
         playable = list(hand)
     else:
-        playable = [card for card in hand if can_play(card, top, s.required)]
+        row = _PLAYABLE[(top + 1) * 5 + s.required + 1]
+        playable = [card for card in hand if row[card]]
     if s.chaining[p] and top != NO_CARD:
         playable = [card for card in playable if card % 8 == top % 8]
 
